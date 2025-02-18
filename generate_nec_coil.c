@@ -738,9 +738,10 @@ int main() {
         magnetic_interactions = (double (*(*))[8])malloc(sizeof(double(*)[8])*(n_points + 1));
         magnetic_interactions[0] = (double (*)[8])malloc(sizeof(double[8])*(n_points + 1));
 
-        for(i = 0; i<8; i++){
+        for(i = 0; i<7; i++){
             magnetic_interactions[0][0][i] = 0;
         }
+        magnetic_interactions[0][0][7] = height;
 
         for(i=1; i<n_points; i++){
             dist_x= 0.5*(point_array[i-1].x + point_array[i].x) - point_array[0].x;
@@ -984,7 +985,7 @@ int main() {
             magnetic_interactions[n_points][i][1]= dist_z*dl_x - dl_z*dist_x;
             magnetic_interactions[n_points][i][2] = dist_x*dl_y - dl_x*dist_y;
 
-            dot_prod = point_array[n_points].z*magnetic_interactions[0][i][2];
+            dot_prod = point_array[n_points].z*magnetic_interactions[n_points][i][2];
 
             magnetic_interactions[n_points][i][0] = MU_0*(magnetic_interactions[n_points][i][0] - (dot_prod*point_array[n_points].x)/pow(point_array[n_points].z,2))/(pow(magnetic_interactions[n_points][i][6],3)*4*M_PI);
             magnetic_interactions[n_points][i][1] = MU_0*(magnetic_interactions[n_points][i][1] - (dot_prod*point_array[n_points].y)/pow(point_array[n_points].z,2))/(pow(magnetic_interactions[n_points][i][6],3)*4*M_PI);
@@ -1001,9 +1002,10 @@ int main() {
             magnetic_interactions[n_points][i][5] = 0;
         }
 
-        for(i=0; i<8; i++){
+        for(i=0; i<7; i++){
             magnetic_interactions[n_points][n_points][i] = 0;
         }
+        magnetic_interactions[n_points][n_points][7] = height;
     }
 
 
