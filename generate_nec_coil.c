@@ -177,7 +177,7 @@ Point3D* generate_coil_points(double radius, double length, int n_turns, double 
 
 // cambiar las funciones de resistencia de los segmentos con las ecuaciones de skin y proximity
 int create_nec_file(const char* filename, Point3D* points, int num_points, double wire_radius, double freq, double conductivity,
-                    double complex **currents, const double (*mag_interactions[])[8], double proximity_effect_constant,
+                    double complex **currents, double (*mag_interactions[])[8], double proximity_effect_constant,
                     double proximity_effect_constant_bases, int compute_effects, int *num_iterations, int max_iterations,
                     double conver_max_rel_err) {
   /*    Compute_effects modes
@@ -250,7 +250,7 @@ int create_nec_file(const char* filename, Point3D* points, int num_points, doubl
     double len_segs = sqrt(pow(points[1].x - points[0].x,2) + pow(points[1].y - points[0].y,2) + pow(points[1].z - points[0].z,2));
     double len_bases = points[0].z;
 
-    if(num_iterations == 0){
+    if((*num_iterations) == 0){
         //completar para la primer iteracion(corrientes iguales con efecto skin)
         double skin_depth = sqrt((sqrt(1 + pow(2*M_PI*freq*EPS_0/conductivity,2)) + 2*M_PI*freq*EPS_0/conductivity)/(freq*M_PI*MU_0*conductivity));
         double complex skin_inverse_eff_area = (skin_depth*(cexp(-2*wire_radius*(1 + I)/skin_depth) - 1) + 2*wire_radius*(1 + I))/(2*M_PI*skin_depth*cpow(wire_radius*(1 - cexp(-wire_radius*(1 + I)/skin_depth)),2));
@@ -306,7 +306,7 @@ int create_nec_file(const char* filename, Point3D* points, int num_points, doubl
             currents[0][i] = curr_stimated;
             currents[1][i] = 0;
         }
-        *num_iterations++;
+        (*num_iterations)++;
     }
     else{
       double rel_error = 0;
@@ -324,7 +324,7 @@ int create_nec_file(const char* filename, Point3D* points, int num_points, doubl
         }
     }
 
-      if((*num_iterations < max_iterations) && (rel_error >= conver_max_rel_err)){
+      if(((*num_iterations) < max_iterations) && (rel_error >= conver_max_rel_err)){
 
         double skin_depth = sqrt((sqrt(1 + pow(2*M_PI*freq*EPS_0/conductivity,2)) + 2*M_PI*freq*EPS_0/conductivity)/(freq*M_PI*MU_0*conductivity));
         double complex skin_inverse_eff_area = (skin_depth*(cexp(-2*wire_radius*(1 + I)/skin_depth) - 1) + 2*wire_radius*(1 + I))/(2*M_PI*skin_depth*cpow(wire_radius*(1 - cexp(-wire_radius*(1 + I)/skin_depth)),2));
@@ -372,7 +372,7 @@ int create_nec_file(const char* filename, Point3D* points, int num_points, doubl
             fprintf(fp, "LD 4 0 %d 0 %lf %lf\n", i+1, creal(eq_impedance), cimag(eq_impedance));
 
         }
-        *num_iterations++;
+        (*num_iterations)++;
 
 
       }
@@ -966,7 +966,7 @@ int main() {
 
         dot_prod_ref = 0;
 
-        for(i=1; 1<n_points;i++){
+        for(i=1; i<n_points;i++){
             dist_x= 0.5*(point_array[i-1].x + point_array[i].x) - point_array[n_points].x;
             dist_y= 0.5*(point_array[i-1].y + point_array[i].y) - point_array[n_points].y;
             dist_z= 0.5*(point_array[i-1].z + point_array[i].z) - 0.5*height;
@@ -1027,7 +1027,7 @@ int main() {
             for(int i = 0; i <= n_points; i++){
                 currents[1][i]= currents[0][i];
             }
-            read_simulation_currents_data(input_filename,currents_line_offset,n_points+1,currents[0]);
+            read_simulation_currents_data(out_filename,currents_line_offset,n_points+1,currents[0]);
         }
 
         // Measure impedance parameter from output file
@@ -1035,11 +1035,30 @@ int main() {
 
         impedance_array[0] = read_impedance_data_nec_out(out_filename, impedance_line_offset);
         frequency_array[0] = freq;
+
+        for(i = 1; i<freq_step_num; i++){
+            iterations = 0;
+
+            while(1 != create_nec_file(input_filename, point_array, n_points, wire_rad, freq, conductivity,currents,magnetic_interactions,proximity_effect_constant, proximity_effect_constant_bases,3,&iterations,max_iterations,0.01/(n_points+1))){
+                // Execute the simulation using nec2c engine
+                system(full_prompt);
+                //Extract the currents in the simulation and update the currents array
+                for(int i = 0; i <= n_points; i++){
+                    currents[1][i]= currents[0][i];
+                }
+                read_simulation_currents_data(out_filename,currents_line_offset,n_points+1,currents[0]);
+            }
+
+            // Measure impedance parameter from output file
+            impedance_array[i] = read_impedance_data_nec_out(out_filename, impedance_line_offset);
+            frequency_array[i] = freq + i*freq_step;
+            //printf("Freq(%lf) Re(%lf) Im(%lf)\n", freq +  i*freq_step, creal(impedance_array[i]), cimag(impedance_array[i]));
+        }
     }
     else{
         if(use_skin_effect){
             // Create the NEC file with the user inputs
-            create_nec_file(input_filename, point_array, n_points, wire_rad, freq, conductivity);
+            create_nec_file(input_filename, point_array, n_points, wire_rad, freq, conductivity,currents,magnetic_interactions,proximity_effect_constant, proximity_effect_constant_bases,2,&iterations,max_iterations,0.01/(n_points+1));
 
             // Execute the simulation using nec2c engine
             system(full_prompt);
@@ -1049,10 +1068,23 @@ int main() {
 
             impedance_array[0] = read_impedance_data_nec_out(out_filename, impedance_line_offset);
             frequency_array[0] = freq;
+            for(i = 1; i<freq_step_num; i++){
+
+                // Create the NEC file with the user inputs
+                create_nec_file(input_filename, point_array, n_points, wire_rad, freq, conductivity,currents,magnetic_interactions,proximity_effect_constant, proximity_effect_constant_bases,2,&iterations,max_iterations,0.01/(n_points+1));
+
+                // Execute the simulation using nec2c engine
+                system(full_prompt);
+
+                // Measure impedance parameter from output file
+                impedance_array[i] = read_impedance_data_nec_out(out_filename, impedance_line_offset);
+                frequency_array[i] = freq + i*freq_step;
+                //printf("Freq(%lf) Re(%lf) Im(%lf)\n", freq +  i*freq_step, creal(impedance_array[i]), cimag(impedance_array[i]));
+            }
         }
         else{
             // Create the NEC file with the user inputs
-            create_nec_file(input_filename, point_array, n_points, wire_rad, freq, conductivity);
+            create_nec_file(input_filename, point_array, n_points, wire_rad, freq, conductivity,currents,magnetic_interactions,proximity_effect_constant, proximity_effect_constant_bases,1,&iterations,max_iterations,0.01/(n_points+1));
 
             // Execute the simulation using nec2c engine
             system(full_prompt);
@@ -1062,6 +1094,20 @@ int main() {
 
             impedance_array[0] = read_impedance_data_nec_out(out_filename, impedance_line_offset);
             frequency_array[0] = freq;
+
+            for(i = 1; i<freq_step_num; i++){
+
+                // Create the NEC file with the user inputs
+                create_nec_file(input_filename, point_array, n_points, wire_rad, freq, conductivity,currents,magnetic_interactions,proximity_effect_constant, proximity_effect_constant_bases,1,&iterations,max_iterations,0.01/(n_points+1));
+
+                // Execute the simulation using nec2c engine
+                system(full_prompt);
+
+                // Measure impedance parameter from output file
+                impedance_array[i] = read_impedance_data_nec_out(out_filename, impedance_line_offset);
+                frequency_array[i] = freq + i*freq_step;
+                //printf("Freq(%lf) Re(%lf) Im(%lf)\n", freq +  i*freq_step, creal(impedance_array[i]), cimag(impedance_array[i]));
+            }
         }
     }
 
@@ -1069,7 +1115,7 @@ int main() {
     for(i = 1; i<freq_step_num; i++){
 
         // Create the NEC file with the user inputs
-        create_nec_file(input_filename, point_array, n_points, wire_rad, freq + i*freq_step, conductivity);
+        create_nec_file(input_filename, point_array, n_points, wire_rad, freq, conductivity,currents,magnetic_interactions,proximity_effect_constant, proximity_effect_constant_bases,3,&iterations,max_iterations,0.01/(n_points+1));
 
         // Execute the simulation using nec2c engine
         system(full_prompt);
