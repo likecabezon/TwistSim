@@ -628,7 +628,34 @@ void generate_touchstone(
     printf("Touchstone file created: %s\n", filename);
 }
 
+// Function to compute the single integral using Simpson's rule
+double compute_prox_eff_geometry_integral(double R, double L, int n_intervals) {
+    // n_intervals must be even for Simpson's rule
+    if (n_intervals % 2 != 0) {
+        n_intervals++;  // Increase by 1 if odd
+    }
 
+    double h = R / n_intervals;
+    double integral = 0.0;
+
+    for (int i = 0; i <= n_intervals; i++) {
+        double x = i * h;
+        // Ensure the square root argument is non-negative (it should be by definition)
+        double sqrt_term = sqrt(R*R - x*x);
+        double f = (x*x * sqrt_term) / (2*x + L);
+
+        if (i == 0 || i == n_intervals) {
+            integral += f;
+        } else if (i % 2 == 1) {
+            integral += 4 * f;
+        } else {
+            integral += 2 * f;
+        }
+    }
+
+    integral *= h / 3.0;
+    return integral;
+}
 
 int main() {
     // Declare variables for user input
@@ -706,33 +733,11 @@ int main() {
     double proximity_effect_constant, proximity_effect_constant_bases;
     double (*(*magnetic_interactions))[8] = NULL;
     if(use_proximity_effect){
-        int integral_grid_num = 21;
-        double quarter_section_integral = 0, increment = segment_length/(integral_grid_num -1);
-        double wheight = increment/3;
 
-        double first_f = pow(2*increment, 2)*sqrt(pow(wire_rad, 2) - pow(2*increment, 2))/pow(4*increment + segment_length,2);
-        quarter_section_integral = wheight * (4*pow(increment, 2)*sqrt(pow(wire_rad, 2) - pow(increment, 2))/pow(2*increment + segment_length, 2) + first_f);
+        proximity_effect_constant = -4 * compute_prox_eff_geometry_integral(wire_rad, segment_length, 1000) * pow(segment_length * conductivity, 2);
+        proximity_effect_constant_bases = -4 * compute_prox_eff_geometry_integral(height, segment_length, 1000) * pow(height * conductivity, 2);
 
-        for(i=3; i<21; i += 2){
-            double last_f = pow((i+1)*increment, 2)*sqrt(pow(wire_rad, 2) - pow((i+1)*increment, 2))/pow((i+1)*2*increment + segment_length,2);
-
-            quarter_section_integral += wheight*(first_f + 4*pow(i*increment, 2)*sqrt(pow(wire_rad, 2) - pow(i*increment, 2))/pow(i*2*increment + segment_length,2) + last_f);
-
-            first_f = last_f;
-        }
-        proximity_effect_constant = -4 * quarter_section_integral * pow(segment_length * conductivity, 2);
-
-        first_f = pow(2*increment, 2)*sqrt(pow(wire_rad, 2) - pow(2*increment, 2))/pow(4*increment + height,2);
-        quarter_section_integral = wheight * (4*pow(increment, 2)*sqrt(pow(wire_rad, 2) - pow(increment, 2))/pow(2*increment + height, 2) + first_f);
-
-        for(i=3; i<21; i += 2){
-            double last_f = pow((i+1)*increment, 2)*sqrt(pow(wire_rad, 2) - pow((i+1)*increment, 2))/pow((i+1)*2*increment + height,2);
-
-            quarter_section_integral += wheight*(first_f + 4*pow(i*increment, 2)*sqrt(pow(wire_rad, 2) - pow(i*increment, 2))/pow(i*2*increment + height,2) + last_f);
-
-            first_f = last_f;
-        }
-        proximity_effect_constant_bases = -4 * quarter_section_integral * pow(height * conductivity, 2);
+        //printf("\n%e %e %e\n",compute_prox_eff_geometry_integral(wire_rad, segment_length, 1000), segment_length, proximity_effect_constant);
 
         double dist_x, dist_y, dist_z, dist_z_ref, dl_x, dl_y, dl_z, dl_z_ref, dot_prod, dot_prod_ref ;
 
@@ -1020,7 +1025,7 @@ int main() {
         }
         //printf("\n");
     }
-    printf("\ndebug: %e %e\n", proximity_effect_constant, proximity_effect_constant_bases);
+    //printf("\ndebug: %e %e\n", proximity_effect_constant, proximity_effect_constant_bases);
 
     if(use_proximity_effect){
         currents[0] = (double complex*)malloc((n_points+1) * sizeof(double complex));
