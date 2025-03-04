@@ -262,21 +262,22 @@ int create_nec_file(const char* filename, Point3D* points, int num_points, doubl
             double complex b_field_x = 0, b_field_y = 0, b_field_z = 0, b_tot, prox_current, eq_impedance;
             for(int j = 0; j <= num_points; j++){
                 if(i != j){
-                    b_field_x += skin_curr * ((mag_interactions[i][j][0]*cexp(mag_interactions[i][j][6]*2*M_PI*freq*I/SPEED_OF_LIGHT)/mag_interactions[i][j][6]) + (mag_interactions[i][j][3]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT)/mag_interactions[i][j][7]));
+                    b_field_x += skin_curr * (mag_interactions[i][j][0]*cexp(mag_interactions[i][j][6]*2*M_PI*freq*I/SPEED_OF_LIGHT)
+                            + mag_interactions[i][j][3]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT));
 
 
-                    b_field_y += skin_curr * ((mag_interactions[i][j][1]*cexp(mag_interactions[i][j][6]*2*M_PI*freq*I/SPEED_OF_LIGHT)/mag_interactions[i][j][6])
-                            + (mag_interactions[i][j][4]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT)/mag_interactions[i][j][7]));
+                    b_field_y += skin_curr * (mag_interactions[i][j][1]*cexp(mag_interactions[i][j][6]*2*M_PI*freq*I/SPEED_OF_LIGHT)
+                            + mag_interactions[i][j][4]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT));
 
-                    b_field_z += skin_curr * ((mag_interactions[i][j][2]*cexp(mag_interactions[i][j][6]*2*M_PI*freq*I/SPEED_OF_LIGHT)/mag_interactions[i][j][6])
-                            + (mag_interactions[i][j][5]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT)/mag_interactions[i][j][7]));
+                    b_field_z += skin_curr * (mag_interactions[i][j][2]*cexp(mag_interactions[i][j][6]*2*M_PI*freq*I/SPEED_OF_LIGHT)
+                            + mag_interactions[i][j][5]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT));
                 }
                 else{
-                    b_field_x += skin_curr * mag_interactions[i][j][3]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT)/mag_interactions[i][j][7];
+                    b_field_x += skin_curr * mag_interactions[i][j][3]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT);
 
-                    b_field_y += skin_curr * mag_interactions[i][j][4]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT)/mag_interactions[i][j][7];
+                    b_field_y += skin_curr * mag_interactions[i][j][4]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT);
 
-                    b_field_z += skin_curr * mag_interactions[i][j][5]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT)/mag_interactions[i][j][7];
+                    b_field_z += skin_curr * mag_interactions[i][j][5]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT);
                 }
 
             }
@@ -297,10 +298,10 @@ int create_nec_file(const char* filename, Point3D* points, int num_points, doubl
                 len = len_segs;
             }
 
-            eq_impedance = len * (skin_inverse_eff_area + prox_current/cpow(currents[1][i],2))/conductivity;
+            eq_impedance = len * (skin_inverse_eff_area + prox_current/cpow(skin_curr,2))/conductivity;
             fprintf(fp, "LD 4 0 %d 0 %lf %lf\n", i+1, creal(eq_impedance), cimag(eq_impedance));
             cum_impedance += eq_impedance;
-            //printf("\n%e %e %e\n", cabs(b_tot),cabs(freq),cabs(proximity_effect_constant_bases));
+            printf("\n%e",cabs(eq_impedance));
         }
         double complex curr_stimated = 1/cum_impedance;
         for(int i = 0; i <= num_points; i++){
@@ -311,7 +312,7 @@ int create_nec_file(const char* filename, Point3D* points, int num_points, doubl
     }
     else{
       double rel_error = 0;
-
+      printf("\n%d",*num_iterations);
       for (int i = 0; i <= num_points; i++) {
 
         // Compute relative squared error for this segment
@@ -336,21 +337,22 @@ int create_nec_file(const char* filename, Point3D* points, int num_points, doubl
 
             for(int j = 0; j <= num_points; j++){
                 if(i != j){
-                    b_field_x += currents[1][j] * ((mag_interactions[i][j][0]*cexp(mag_interactions[i][j][6]*2*M_PI*freq*I/SPEED_OF_LIGHT)/mag_interactions[i][j][6]) + (mag_interactions[i][j][3]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT)/mag_interactions[i][j][7]));
+                    b_field_x += currents[1][j] * (mag_interactions[i][j][0]*cexp(mag_interactions[i][j][6]*2*M_PI*freq*I/SPEED_OF_LIGHT)
+                            + mag_interactions[i][j][3]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT));
 
 
-                    b_field_y += currents[1][j] * ((mag_interactions[i][j][1]*cexp(mag_interactions[i][j][6]*2*M_PI*freq*I/SPEED_OF_LIGHT)/mag_interactions[i][j][6])
-                            + (mag_interactions[i][j][4]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT)/mag_interactions[i][j][7]));
+                    b_field_y += currents[1][j] * (mag_interactions[i][j][1]*cexp(mag_interactions[i][j][6]*2*M_PI*freq*I/SPEED_OF_LIGHT)
+                            + mag_interactions[i][j][4]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT));
 
-                    b_field_z += currents[1][j] * ((mag_interactions[i][j][2]*cexp(mag_interactions[i][j][6]*2*M_PI*freq*I/SPEED_OF_LIGHT)/mag_interactions[i][j][6])
-                            + (mag_interactions[i][j][5]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT)/mag_interactions[i][j][7]));
+                    b_field_z += currents[1][j] * (mag_interactions[i][j][2]*cexp(mag_interactions[i][j][6]*2*M_PI*freq*I/SPEED_OF_LIGHT)
+                            + mag_interactions[i][j][5]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT));
                 }
                 else{
-                    b_field_x += currents[1][j] * mag_interactions[i][j][3]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT)/mag_interactions[i][j][7];
+                    b_field_x += currents[1][j] * mag_interactions[i][j][3]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT);
 
-                    b_field_y += currents[1][j] * mag_interactions[i][j][4]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT)/mag_interactions[i][j][7];
+                    b_field_y += currents[1][j] * mag_interactions[i][j][4]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT);
 
-                    b_field_z += currents[1][j] * mag_interactions[i][j][5]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT)/mag_interactions[i][j][7];
+                    b_field_z += currents[1][j] * mag_interactions[i][j][5]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT);
                 }
             }
             b_tot = sqrt(pow(creal(b_field_x),2) + pow(creal(b_field_y),2) + pow(creal(b_field_z),2))
@@ -371,6 +373,7 @@ int create_nec_file(const char* filename, Point3D* points, int num_points, doubl
 
             eq_impedance = len * (skin_inverse_eff_area + prox_current/cpow(currents[1][i],2))/conductivity;
             fprintf(fp, "LD 4 0 %d 0 %lf %lf\n", i+1, creal(eq_impedance), cimag(eq_impedance));
+            printf("\n%e", cabs(eq_impedance));
 
         }
         (*num_iterations)++;
@@ -707,7 +710,7 @@ int main() {
     printf("Enter the number of frequency steps (e.g., 58): ");
     scanf("%d", &freq_step_num);
 
-    printf("Enter the output NEC file name (e.g., first_coil.nec): ");
+    printf("Enter the output NEC file name (e.g., first_coil): ");
     scanf("%s", file_name);
 
     if(freq_step_num <1){
@@ -735,9 +738,9 @@ int main() {
     if(use_proximity_effect){
 
         proximity_effect_constant = -4 * compute_prox_eff_geometry_integral(wire_rad, segment_length, 1000) * pow(segment_length * conductivity, 2);
-        proximity_effect_constant_bases = -4 * compute_prox_eff_geometry_integral(height, segment_length, 1000) * pow(height * conductivity, 2);
+        proximity_effect_constant_bases = -4 * compute_prox_eff_geometry_integral(wire_rad, height, 1000) * pow(height * conductivity, 2);
 
-        //printf("\n%e %e %e\n",compute_prox_eff_geometry_integral(wire_rad, segment_length, 1000), segment_length, proximity_effect_constant);
+        printf("\n%e %e %e\n",compute_prox_eff_geometry_integral(wire_rad, segment_length, 1000), segment_length, proximity_effect_constant);
 
         double dist_x, dist_y, dist_z, dist_z_ref, dl_x, dl_y, dl_z, dl_z_ref, dot_prod, dot_prod_ref ;
 
