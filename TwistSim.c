@@ -234,17 +234,17 @@ int create_nec_file(const char* filename, Point3D* points, int num_points, doubl
   }
   else if(compute_effects == 2){
     double skin_depth = sqrt((sqrt(1 + pow(2*M_PI*freq*EPS_0/conductivity,2)) + 2*M_PI*freq*EPS_0/conductivity)/(freq*M_PI*MU_0*conductivity));
-    double complex inverse_eff_area = (skin_depth*(cexp(-2*wire_radius*(1 + I)/skin_depth) - 1) + 2*wire_radius*(1 + I))/(2*M_PI*skin_depth*cpow(wire_radius*(1 - cexp(-wire_radius*(1 + I)/skin_depth)),2));
-    double complex impedance = inverse_eff_area * points[0].z/conductivity;
-    fprintf(fp, "LD 4 0 1 0 %lf %lf\n", creal(impedance), cimag(impedance));
+    double loss_coeff = (2*wire_radius - skin_depth*(1 - exp(-2*wire_radius/conductivity)))/(wire_radius*(1 - 2*exp(-wire_radius/skin_depth)*cos(wire_radius/skin_depth) + exp(-2*wire_radius/skin_depth)));
+    double resistance = loss_coeff * points[0].z/conductivity;
+    fprintf(fp, "LD 4 0 1 0 %lf 0\n", resistance);
 
-    impedance = inverse_eff_area * sqrt(pow(points[0].x - points[1].x,2) + pow(points[0].y - points[1].y,2) + pow(points[0].z - points[1].z,2))/conductivity;
+    resistance = loss_coeff * sqrt(pow(points[0].x - points[1].x,2) + pow(points[0].y - points[1].y,2) + pow(points[0].z - points[1].z,2))/conductivity;
     for(int i = 2; i < num_points + 1; i++){
-      fprintf(fp, "LD 4 0 %d 0 %lf %lf\n", i, creal(impedance), cimag(impedance));
+      fprintf(fp, "LD 4 0 %d 0 %lf 0\n", i, resistance);
     }
 
-    impedance = inverse_eff_area * points[num_points - 1].z/conductivity;
-    fprintf(fp, "LD 4 0 %d 0 %lf %lf\n", num_points + 1, creal(impedance), cimag(impedance));
+    resistance = loss_coeff * points[num_points - 1].z/conductivity;
+    fprintf(fp, "LD 4 0 %d 0 %lf 0\n", num_points + 1, resistance);
   }
   else if(compute_effects == 3){
     double len_segs = sqrt(pow(points[1].x - points[0].x,2) + pow(points[1].y - points[0].y,2) + pow(points[1].z - points[0].z,2));
@@ -253,13 +253,14 @@ int create_nec_file(const char* filename, Point3D* points, int num_points, doubl
     if((*num_iterations) == 0){
         //completar para la primer iteracion(corrientes iguales con efecto skin)
         double skin_depth = sqrt((sqrt(1 + pow(2*M_PI*freq*EPS_0/conductivity,2)) + 2*M_PI*freq*EPS_0/conductivity)/(freq*M_PI*MU_0*conductivity));
-        double complex skin_inverse_eff_area = (skin_depth*(cexp(-2*wire_radius*(1 + I)/skin_depth) - 1) + 2*wire_radius*(1 + I))/(2*M_PI*skin_depth*cpow(wire_radius*(1 - cexp(-wire_radius*(1 + I)/skin_depth)),2));
-        double complex skin_curr = conductivity/(skin_inverse_eff_area*((num_points-1)*len_segs + 2*len_bases));
-        double complex cum_impedance = 0;
+        double skin_loss_coeff = (2*wire_radius - skin_depth*(1 - exp(-2*wire_radius/conductivity)))/(wire_radius*(1 - 2*exp(-wire_radius/skin_depth)*cos(wire_radius/skin_depth) + exp(-2*wire_radius/skin_depth)));
+        double skin_curr = conductivity/(skin_loss_coeff*((num_points-1)*len_segs + 2*len_bases));
+        double cum_resistance = 0;
 
         for(int i = 0; i <= num_points; i++){
             double len;
-            double complex b_field_x = 0, b_field_y = 0, b_field_z = 0, b_tot, prox_current, eq_impedance;
+            double complex b_field_x = 0, b_field_y = 0, b_field_z = 0;
+            double b_tot_squared, prox_current, eq_resistance;
             for(int j = 0; j <= num_points; j++){
                 if(i != j){
                     b_field_x += skin_curr * (mag_interactions[i][j][0]*cexp(mag_interactions[i][j][6]*2*M_PI*freq*I/SPEED_OF_LIGHT)
@@ -282,28 +283,23 @@ int create_nec_file(const char* filename, Point3D* points, int num_points, doubl
 
             }
             //printf("\n%e %e %e\n", cabs(b_field_x),cabs(b_field_y),cabs(b_field_z));
-            b_tot = sqrt(pow(creal(b_field_x),2) + pow(creal(b_field_y),2) + pow(creal(b_field_z),2))
-                    + I * sqrt(pow(cimag(b_field_x),2) + pow(cimag(b_field_y),2) + pow(cimag(b_field_z),2));
+            b_tot_squared = pow(creal(b_field_x),2) + pow(creal(b_field_y),2) + pow(creal(b_field_z),2) + pow(cimag(b_field_x),2) + pow(cimag(b_field_y),2) + pow(cimag(b_field_z),2);
+
+            prox_current = M_PI*b_tot_squared*pow(freq*M_PI*conductivity*wire_radius*wire_radius,2);
 
             if((i == 0) || (i == num_points)){
-                prox_current = proximity_effect_constant_bases * 4 * cpow(freq * creal(b_tot) * M_PI,2);
-                prox_current += proximity_effect_constant_bases * -4 * cpow(freq * cimag(b_tot) * M_PI,2);
-                prox_current += proximity_effect_constant_bases * 4 * I * sqrt(pow(creal(b_field_x)*cimag(b_field_x),2) + pow(creal(b_field_y)*cimag(b_field_y),2) + pow(creal(b_field_z)*cimag(b_field_z),2)) * cpow(freq * M_PI,2);
                 len = len_bases;
             }
             else{
-                prox_current = proximity_effect_constant * 4 * M_PI * M_PI * cpow(freq * creal(b_tot),2);
-                prox_current += proximity_effect_constant * -4 * cpow(freq * cimag(b_tot) * M_PI,2);
-                prox_current += proximity_effect_constant * 4 * I * sqrt(pow(creal(b_field_x)*cimag(b_field_x),2) + pow(creal(b_field_y)*cimag(b_field_y),2) + pow(creal(b_field_z)*cimag(b_field_z),2)) * cpow(freq * M_PI,2);
                 len = len_segs;
             }
 
-            eq_impedance = len * (skin_inverse_eff_area + prox_current/cpow(skin_curr,2))/conductivity;
-            fprintf(fp, "LD 4 0 %d 0 %lf %lf\n", i+1, creal(eq_impedance), cimag(eq_impedance));
-            cum_impedance += eq_impedance;
-            printf("\n%e",cabs(eq_impedance));
+            eq_resistance = len * (skin_loss_coeff + prox_current/cpow(skin_curr,2))/conductivity;
+            fprintf(fp, "LD 4 0 %d 0 %lf 0\n", i+1, eq_resistance);
+            cum_resistance += eq_resistance;
+            printf("\n%e",eq_resistance);
         }
-        double complex curr_stimated = 1/cum_impedance;
+        double complex curr_stimated = 1/cum_resistance;
         for(int i = 0; i <= num_points; i++){
             currents[0][i] = curr_stimated;
             currents[1][i] = 0;
@@ -319,61 +315,59 @@ int create_nec_file(const char* filename, Point3D* points, int num_points, doubl
         if (cabs(currents[0][i]) > 0) { // Avoid division by zero
 
           rel_error += cabs(currents[0][i] - currents[1][i])/cabs(currents[0][i]);
+          printf("Rel_error = %e; currents[0][%d] = %e + j%e; currents[1][%d] = %e + j%e\n", rel_error, i, creal(currents[0][i]), cimag(currents[0][i]), i, creal(currents[1][i]), cimag(currents[1][i]));
         }
         else if(cabs(currents[1][i]) > 0){ // Avoid division by zero
 
           rel_error += cabs(currents[0][i] - currents[1][i])/cabs(currents[1][i]);
+          printf("Rel_error = %e; currents[0][%d] = %e + j%e; currents[1][%d] = %e + j%e\n", rel_error, i, creal(currents[0][i]), cimag(currents[0][i]), i, creal(currents[1][i]), cimag(currents[1][i]));
         }
     }
 
       if(((*num_iterations) < max_iterations) && (rel_error >= conver_max_rel_err)){
 
         double skin_depth = sqrt((sqrt(1 + pow(2*M_PI*freq*EPS_0/conductivity,2)) + 2*M_PI*freq*EPS_0/conductivity)/(freq*M_PI*MU_0*conductivity));
-        double complex skin_inverse_eff_area = (skin_depth*(cexp(-2*wire_radius*(1 + I)/skin_depth) - 1) + 2*wire_radius*(1 + I))/(2*M_PI*skin_depth*cpow(wire_radius*(1 - cexp(-wire_radius*(1 + I)/skin_depth)),2));
+        double skin_loss_coeff = (2*wire_radius - skin_depth*(1 - exp(-2*wire_radius/conductivity)))/(wire_radius*(1 - 2*exp(-wire_radius/skin_depth)*cos(wire_radius/skin_depth) + exp(-2*wire_radius/skin_depth)));
 
         for(int i = 0; i <= num_points; i++){
             double len;
-            double complex b_field_x = 0, b_field_y = 0, b_field_z = 0, b_tot, prox_current, eq_impedance;
-
+            double complex b_field_x = 0, b_field_y = 0, b_field_z = 0;
+            double b_tot_squared, prox_current, eq_resistance;
             for(int j = 0; j <= num_points; j++){
                 if(i != j){
-                    b_field_x += currents[1][j] * (mag_interactions[i][j][0]*cexp(mag_interactions[i][j][6]*2*M_PI*freq*I/SPEED_OF_LIGHT)
+                    b_field_x += (0.2*currents[0][j] + 0.8*currents[1][j]) * (mag_interactions[i][j][0]*cexp(mag_interactions[i][j][6]*2*M_PI*freq*I/SPEED_OF_LIGHT)
                             + mag_interactions[i][j][3]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT));
 
 
-                    b_field_y += currents[1][j] * (mag_interactions[i][j][1]*cexp(mag_interactions[i][j][6]*2*M_PI*freq*I/SPEED_OF_LIGHT)
+                    b_field_y += (0.2*currents[0][j] + 0.8*currents[1][j]) * (mag_interactions[i][j][1]*cexp(mag_interactions[i][j][6]*2*M_PI*freq*I/SPEED_OF_LIGHT)
                             + mag_interactions[i][j][4]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT));
 
-                    b_field_z += currents[1][j] * (mag_interactions[i][j][2]*cexp(mag_interactions[i][j][6]*2*M_PI*freq*I/SPEED_OF_LIGHT)
+                    b_field_z += (0.2*currents[0][j] + 0.8*currents[1][j]) * (mag_interactions[i][j][2]*cexp(mag_interactions[i][j][6]*2*M_PI*freq*I/SPEED_OF_LIGHT)
                             + mag_interactions[i][j][5]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT));
                 }
                 else{
-                    b_field_x += currents[1][j] * mag_interactions[i][j][3]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT);
+                    b_field_x += (0.2*currents[0][j] + 0.8*currents[1][j]) * mag_interactions[i][j][3]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT);
 
-                    b_field_y += currents[1][j] * mag_interactions[i][j][4]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT);
+                    b_field_y += (0.2*currents[0][j] + 0.8*currents[1][j]) * mag_interactions[i][j][4]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT);
 
-                    b_field_z += currents[1][j] * mag_interactions[i][j][5]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT);
+                    b_field_z += (0.2*currents[0][j] + 0.8*currents[1][j]) * mag_interactions[i][j][5]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT);
                 }
             }
-            b_tot = sqrt(pow(creal(b_field_x),2) + pow(creal(b_field_y),2) + pow(creal(b_field_z),2))
-                    + I * sqrt(pow(cimag(b_field_x),2) + pow(cimag(b_field_y),2) + pow(cimag(b_field_z),2));
+
+            b_tot_squared = pow(creal(b_field_x),2) + pow(creal(b_field_y),2) + pow(creal(b_field_z),2) + pow(cimag(b_field_x),2) + pow(cimag(b_field_y),2) + pow(cimag(b_field_z),2);
+
+            prox_current = M_PI*b_tot_squared*pow(freq*M_PI*conductivity*wire_radius*wire_radius,2);
 
             if((i == 0) || (i == num_points)){
-                prox_current = proximity_effect_constant_bases * 4 * cpow(freq * creal(b_tot) * M_PI,2);
-                prox_current += proximity_effect_constant_bases * -4 * cpow(freq * cimag(b_tot) * M_PI,2);
-                prox_current += proximity_effect_constant_bases * 4 * I * sqrt(pow(creal(b_field_x)*cimag(b_field_x),2) + pow(creal(b_field_y)*cimag(b_field_y),2) + pow(creal(b_field_z)*cimag(b_field_z),2)) * cpow(freq * M_PI,2);
                 len = len_bases;
             }
             else{
-                prox_current = proximity_effect_constant * 4 * M_PI * M_PI * cpow(freq * creal(b_tot),2);
-                prox_current += proximity_effect_constant * -4 * cpow(freq * cimag(b_tot) * M_PI,2);
-                prox_current += proximity_effect_constant * 4 * I * sqrt(pow(creal(b_field_x)*cimag(b_field_x),2) + pow(creal(b_field_y)*cimag(b_field_y),2) + pow(creal(b_field_z)*cimag(b_field_z),2)) * cpow(freq * M_PI,2);
                 len = len_segs;
             }
 
-            eq_impedance = len * (skin_inverse_eff_area + prox_current/cpow(currents[1][i],2))/conductivity;
-            fprintf(fp, "LD 4 0 %d 0 %lf %lf\n", i+1, creal(eq_impedance), cimag(eq_impedance));
-            printf("\n%e", cabs(eq_impedance));
+            eq_resistance = len * (skin_loss_coeff + prox_current/pow(cabs(currents[1][i]),2))/conductivity;
+            fprintf(fp, "LD 4 0 %d 0 %lf 0\n", i+1, eq_resistance);
+            printf("\n%e", cabs(eq_resistance));
 
         }
         (*num_iterations)++;
@@ -671,6 +665,7 @@ int main() {
     char* input_filename = NULL;
     char* out_filename = NULL;
     char* prompt_base = "nec2c -i ";
+    char* prompt_mid = " -o ";
     char* full_prompt = NULL;
     long impedance_line_offset;
     long currents_line_offset;
@@ -725,10 +720,12 @@ int main() {
     append_extensions(file_name, &input_filename, &out_filename, &S_parameter_filename);
 
     // Generate the command for calling nec2c with the coil data
-    size_t command_length = strlen(prompt_base) + strlen(input_filename);
+    size_t command_length = strlen(prompt_base) + strlen(input_filename) + strlen(prompt_mid)+ strlen(out_filename);
     full_prompt = (char *)malloc(command_length + 1);
     strcpy(full_prompt, prompt_base);
     strcat(full_prompt, input_filename);
+    strcat(full_prompt, prompt_mid);
+    strcat(full_prompt, out_filename);
 
     // Generate coil points based on user input
     point_array = generate_coil_points(coil_rad, coil_length, n_turns, wire_rad, freq, freq + freq_step_num * freq_step, height, &n_points, &segment_length, 0, 16);
@@ -1028,8 +1025,7 @@ int main() {
         }
         //printf("\n");
     }
-    //printf("\ndebug: %e %e\n", proximity_effect_constant, proximity_effect_constant_bases);
-
+    //printf("String content: %s\n", out_filename);
     if(use_proximity_effect){
         currents[0] = (double complex*)malloc((n_points+1) * sizeof(double complex));
         currents[1] = (double complex*)malloc((n_points+1) * sizeof(double complex));
@@ -1037,7 +1033,7 @@ int main() {
             printf("\nMemory allocation error with currents array\n");
         }
 
-        currents_line_offset = find_string_in_file(out_filename, currents_line_preamble, 4);
+
         iterations = 0;
 
         // Create the NEC file with the user inputs and iterate to find the solution
@@ -1050,6 +1046,9 @@ int main() {
             for(int i = 0; i <= n_points; i++){
                 currents[1][i]= currents[0][i];
             }
+
+            currents_line_offset = find_string_in_file(out_filename, currents_line_preamble, 4);
+
             read_simulation_currents_data(out_filename,currents_line_offset,n_points+1,currents[0]);
         }
 
@@ -1070,7 +1069,9 @@ int main() {
                 for(int i = 0; i <= n_points; i++){
                     currents[1][i]= currents[0][i];
                 }
+                currents_line_offset = find_string_in_file(out_filename, currents_line_preamble, 4);
                 read_simulation_currents_data(out_filename,currents_line_offset,n_points+1,currents[0]);
+
             }
 
             // Measure impedance parameter from output file
