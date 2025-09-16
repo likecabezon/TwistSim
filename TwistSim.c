@@ -251,7 +251,7 @@ int create_nec_file(const char* filename, Point3D* points, int num_points, doubl
     double len_bases = points[0].z;
 
     if((*num_iterations) == 0){
-        //completar para la primer iteracion(corrientes iguales con efecto skin)
+        //completar para la primera iteracion(corrientes iguales con efecto skin)
         double skin_depth = sqrt((sqrt(1 + pow(2*M_PI*freq*EPS_0/conductivity,2)) + 2*M_PI*freq*EPS_0/conductivity)/(freq*M_PI*MU_0*conductivity));
         double skin_loss_coeff = (2*wire_radius - skin_depth*(1 - exp(-2*wire_radius/conductivity)))/(wire_radius*(1 - 2*exp(-wire_radius/skin_depth)*cos(wire_radius/skin_depth) + exp(-2*wire_radius/skin_depth)));
         double skin_curr = conductivity/(skin_loss_coeff*((num_points-1)*len_segs + 2*len_bases));
@@ -308,19 +308,21 @@ int create_nec_file(const char* filename, Point3D* points, int num_points, doubl
     }
     else{
       double rel_error = 0;
-      printf("\n%d",*num_iterations);
+      double mean_squared_coil_curr = 0;
+      //printf("\n%d",*num_iterations);
       for (int i = 0; i <= num_points; i++) {
-
+        mean_squared_coil_curr += pow(cabs(currents[0][i]),2)/(num_points + 1);
         // Compute relative squared error for this segment
-        if (cabs(currents[0][i]) > 0) { // Avoid division by zero
+        if (cabs(currents[0][i]) > 1e-7) { // Avoid division by zero
 
           rel_error += cabs(currents[0][i] - currents[1][i])/cabs(currents[0][i]);
-          printf("Rel_error = %e; currents[0][%d] = %e + j%e; currents[1][%d] = %e + j%e\n", rel_error, i, creal(currents[0][i]), cimag(currents[0][i]), i, creal(currents[1][i]), cimag(currents[1][i]));
+          //printf("Rel_error = %e; currents[0][%d] = %e + j%e; currents[1][%d] = %e + j%e\n", rel_error, i, creal(currents[0][i]), cimag(currents[0][i]), i, creal(currents[1][i]), cimag(currents[1][i]));
         }
-        else if(cabs(currents[1][i]) > 0){ // Avoid division by zero
+        else if(cabs(currents[1][i]) > 1e-7){ // Avoid division by zero
 
           rel_error += cabs(currents[0][i] - currents[1][i])/cabs(currents[1][i]);
-          printf("Rel_error = %e; currents[0][%d] = %e + j%e; currents[1][%d] = %e + j%e\n", rel_error, i, creal(currents[0][i]), cimag(currents[0][i]), i, creal(currents[1][i]), cimag(currents[1][i]));
+
+          //printf("Rel_error = %e; currents[0][%d] = %e + j%e; currents[1][%d] = %e + j%e\n", rel_error, i, creal(currents[0][i]), cimag(currents[0][i]), i, creal(currents[1][i]), cimag(currents[1][i]));
         }
     }
 
@@ -335,22 +337,22 @@ int create_nec_file(const char* filename, Point3D* points, int num_points, doubl
             double b_tot_squared, prox_current, eq_resistance;
             for(int j = 0; j <= num_points; j++){
                 if(i != j){
-                    b_field_x += (0.2*currents[0][j] + 0.8*currents[1][j]) * (mag_interactions[i][j][0]*cexp(mag_interactions[i][j][6]*2*M_PI*freq*I/SPEED_OF_LIGHT)
+                    b_field_x += (1*currents[0][j] + 0*currents[1][j]) * (mag_interactions[i][j][0]*cexp(mag_interactions[i][j][6]*2*M_PI*freq*I/SPEED_OF_LIGHT)
                             + mag_interactions[i][j][3]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT));
 
 
-                    b_field_y += (0.2*currents[0][j] + 0.8*currents[1][j]) * (mag_interactions[i][j][1]*cexp(mag_interactions[i][j][6]*2*M_PI*freq*I/SPEED_OF_LIGHT)
+                    b_field_y += (1*currents[0][j] + 0*currents[1][j]) * (mag_interactions[i][j][1]*cexp(mag_interactions[i][j][6]*2*M_PI*freq*I/SPEED_OF_LIGHT)
                             + mag_interactions[i][j][4]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT));
 
-                    b_field_z += (0.2*currents[0][j] + 0.8*currents[1][j]) * (mag_interactions[i][j][2]*cexp(mag_interactions[i][j][6]*2*M_PI*freq*I/SPEED_OF_LIGHT)
+                    b_field_z += (1*currents[0][j] + 0*currents[1][j]) * (mag_interactions[i][j][2]*cexp(mag_interactions[i][j][6]*2*M_PI*freq*I/SPEED_OF_LIGHT)
                             + mag_interactions[i][j][5]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT));
                 }
                 else{
-                    b_field_x += (0.2*currents[0][j] + 0.8*currents[1][j]) * mag_interactions[i][j][3]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT);
+                    b_field_x += (1*currents[0][j] + 0*currents[1][j]) * mag_interactions[i][j][3]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT);
 
-                    b_field_y += (0.2*currents[0][j] + 0.8*currents[1][j]) * mag_interactions[i][j][4]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT);
+                    b_field_y += (1*currents[0][j] + 0*currents[1][j]) * mag_interactions[i][j][4]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT);
 
-                    b_field_z += (0.2*currents[0][j] + 0.8*currents[1][j]) * mag_interactions[i][j][5]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT);
+                    b_field_z += (1*currents[0][j] + 0*currents[1][j]) * mag_interactions[i][j][5]*cexp(mag_interactions[i][j][7]*2*M_PI*freq*I/SPEED_OF_LIGHT);
                 }
             }
 
@@ -365,9 +367,12 @@ int create_nec_file(const char* filename, Point3D* points, int num_points, doubl
                 len = len_segs;
             }
 
-            eq_resistance = len * (skin_loss_coeff + prox_current/pow(cabs(currents[1][i]),2))/conductivity;
+            eq_resistance = len * (skin_loss_coeff + prox_current/mean_squared_coil_curr)/conductivity;
             fprintf(fp, "LD 4 0 %d 0 %lf 0\n", i+1, eq_resistance);
-            printf("\n%e", cabs(eq_resistance));
+            //printf("\n%e", cabs(eq_resistance));
+            if(i==num_points){
+                //printf("\n%e", cabs(eq_resistance));
+            }
 
         }
         (*num_iterations)++;
@@ -375,6 +380,12 @@ int create_nec_file(const char* filename, Point3D* points, int num_points, doubl
 
       }
       else{
+        if((*num_iterations) >= max_iterations){
+            printf("\nWARNING: Frequency step did not converge to the specified limits\nRel error: %e\n",rel_error);
+        }
+        else{
+            printf("\nSuccessful frequency step in imposed limits using %d iterations\n",(*num_iterations));
+        }
         return 1;
       }
     }
@@ -424,7 +435,7 @@ long find_string_in_file(const char *filename, const char *search_string, int li
 
     // Check if the search string is in the current line
     if (strstr(line, search_string) != NULL) {
-      printf("line_found");
+      //printf("line_found");
       // After finding the target string, skip the next two lines
       for (int i = 0; i < lines_to_skip; i++) {
         if ((read_len = getline(&line, &len, file)) == -1) {
@@ -658,7 +669,7 @@ int main() {
     // Declare variables for user input
     Point3D* point_array = NULL;
     double wire_rad, coil_rad, coil_length, freq, height, freq_step, conductivity = 59.6e6, segment_length;
-    int n_turns, freq_step_num, n_points, i=0, iterations = 0, max_iterations = 20;
+    int n_turns, freq_step_num, n_points, i=0, iterations = 0, max_iterations = 300;
     char file_name[100];
     const char* impedance_line_preamble = "                        --------- ANTENNA INPUT PARAMETERS ---------";
     const char* currents_line_preamble = "                           -------- CURRENTS AND LOCATION --------";
@@ -1031,16 +1042,28 @@ int main() {
         currents[1] = (double complex*)malloc((n_points+1) * sizeof(double complex));
         if(currents[0] == NULL || currents[1] == NULL){
             printf("\nMemory allocation error with currents array\n");
+            return 1;
         }
 
 
-        iterations = 0;
+        iterations = 1;
+
+        //Create a nec2 simulation with only the skin effect only resistance in the wires
+        create_nec_file(input_filename, point_array, n_points, wire_rad, freq, conductivity,currents,magnetic_interactions,proximity_effect_constant, proximity_effect_constant_bases,2,&iterations,max_iterations,0.001*(n_points+1));
+
+        // Execute the simulation using nec2c engine
+        system(full_prompt);
+        //printf("\nok\n");
+
+        //Extract the currents in the simulation and update the currents array
+        currents_line_offset = find_string_in_file(out_filename, currents_line_preamble, 4);
+        read_simulation_currents_data(out_filename,currents_line_offset,n_points+1,currents[0]);
 
         // Create the NEC file with the user inputs and iterate to find the solution
-        while(1 != create_nec_file(input_filename, point_array, n_points, wire_rad, freq, conductivity,currents,magnetic_interactions,proximity_effect_constant, proximity_effect_constant_bases,3,&iterations,max_iterations,0.01/(n_points+1))){
+        while(1 != create_nec_file(input_filename, point_array, n_points, wire_rad, freq, conductivity,currents,magnetic_interactions,proximity_effect_constant, proximity_effect_constant_bases,3,&iterations,max_iterations,0.001*(n_points+1))){
             // Execute the simulation using nec2c engine
             system(full_prompt);
-            printf("\nok\n");
+            //printf("\nok\n");
             //Extract the currents in the simulation and update the currents array
 
             for(int i = 0; i <= n_points; i++){
@@ -1059,12 +1082,23 @@ int main() {
         frequency_array[0] = freq;
 
         for(i = 1; i<freq_step_num; i++){
-            iterations = 0;
+            iterations = 1;
 
-            while(1 != create_nec_file(input_filename, point_array, n_points, wire_rad, freq + i*freq_step, conductivity,currents,magnetic_interactions,proximity_effect_constant, proximity_effect_constant_bases,3,&iterations,max_iterations,0.01/(n_points+1))){
+            //Create a nec2 simulation with only the skin effect only resistance in the wires
+            create_nec_file(input_filename, point_array, n_points, wire_rad, freq + i*freq_step, conductivity,currents,magnetic_interactions,proximity_effect_constant, proximity_effect_constant_bases,2,&iterations,max_iterations,0.001*(n_points+1));
+
+            // Execute the simulation using nec2c engine
+            system(full_prompt);
+            //printf("\nok\n");
+
+            //Extract the currents in the simulation and update the currents array
+            currents_line_offset = find_string_in_file(out_filename, currents_line_preamble, 4);
+            read_simulation_currents_data(out_filename,currents_line_offset,n_points+1,currents[0]);
+
+            while(1 != create_nec_file(input_filename, point_array, n_points, wire_rad, freq + i*freq_step, conductivity,currents,magnetic_interactions,proximity_effect_constant, proximity_effect_constant_bases,3,&iterations,max_iterations,0.001*(n_points+1))){
                 // Execute the simulation using nec2c engine
                 system(full_prompt);
-                printf("\nok\n");
+                //printf("\nok\n");
                 //Extract the currents in the simulation and update the currents array
                 for(int i = 0; i <= n_points; i++){
                     currents[1][i]= currents[0][i];
