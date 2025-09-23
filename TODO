@@ -1,4 +1,3 @@
--Fix the convergence issues with the proximity effect calculations
 -Add adaptative meshing 
 -Use the nec2pp library instead of using the external simulator
 -Optimize the program
